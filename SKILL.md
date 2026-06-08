@@ -1,7 +1,6 @@
 ---
 name: targets-r
-description: >
-  Modern patterns for reproducible analysis pipelines with the targets R package. Use this skill when writing `_targets.R`, defining targets, debugging pipeline failures, running individual targets safely, configuring storage, or integrating Quarto/R Markdown. Covers `tar_target()`, the tarchetypes factories, dynamic and static branching, error handling, cycle debugging, cloud and CAS repositories.
+description: Modern patterns for reproducible analysis pipelines with the targets R package. Use this skill when writing `_targets.R`, defining targets, debugging pipeline failures, running individual targets safely, configuring storage, or integrating Quarto/R Markdown. Covers `tar_target()`, the tarchetypes factories, dynamic and static branching, error handling, cycle debugging, cloud and CAS repositories.
 license: CC-BY-4.0
 metadata:
   author: Ulrich Atz
