@@ -119,6 +119,8 @@ Uses ETag / Last-Modified to avoid re-downloading unchanged data.
 
 ## Function design
 
+For general R function-design practice — argument design and count, naming, when to split a function, side-effect discipline beyond the targets-specific case below — see `r-skills:r-style-guide`. For functions that use tidy evaluation (data-masking, `{{ }}`, injection operators), see `r-skills:rlang-patterns`. What follows is specific to what `targets` needs from a function to track it correctly.
+
 ```r
 # R/clean.R
 clean_data <- function(raw) {
