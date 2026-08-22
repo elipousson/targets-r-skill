@@ -120,6 +120,28 @@ tar_target(
 )
 ```
 
+### Retrying inside a single target
+
+The pipeline-level pattern above (`error = "continue"` + rerun `tar_make()`) works because a retry only costs whatever's still outdated. But for one flaky call buried inside a bigger target — where you'd rather absorb a couple of automatic retries than mark the whole target errored and wait for a second `tar_make()` — wrap the call in a small retry helper instead:
+
+```r
+retry <- function(fn, ..., max_tries = 3, sleep_on_error = 5) {
+  for (attempt in seq_len(max_tries)) {
+    result <- tryCatch(fn(...), error = function(e) e)
+    if (!inherits(result, "error")) return(result)
+    if (attempt < max_tries) Sys.sleep(sleep_on_error)
+  }
+  stop(result)
+}
+
+tar_target(
+  wqp_data,
+  retry(httr::GET, url, httr::timeout(30), max_tries = 3, sleep_on_error = 5)
+)
+```
+
+This solves a different problem than `error = "continue"`/`"trim"`, not a redundant version of it: those decide what happens to the *pipeline* once a target has definitively failed; `retry()` decides whether the target fails at all, by absorbing a few likely-transient hiccups inside its own body first. Reach for it on an individual flaky network call; keep the pipeline-level retry-by-rerunning pattern for failures you're fine surfacing and letting a second `tar_make()` clean up.
+
 ## Verify before running
 
 ```r

@@ -155,6 +155,29 @@ tar_target(
 )
 ```
 
+### Dispatch tables: storing functions as branch-selectable data
+
+When each branch needs genuinely different logic — not just different data — a tibble column can hold the functions themselves, selected and called with `do.call()`, instead of an `if`/`switch()` chain inside one shared function:
+
+```r
+tar_target(
+  cleaning_dispatch,
+  tibble::tibble(
+    characteristic = c("Specific conductance", "Temperature, water"),
+    cleaning_fxn    = c(clean_conductivity_data, clean_temperature_data)
+  )
+),
+tar_target(
+  cleaned,
+  do.call(cleaning_dispatch$cleaning_fxn[[1]], list(cleaning_dispatch$characteristic[[1]])),
+  pattern = map(cleaning_dispatch)
+)
+```
+
+`targets` statically detects function symbols referenced anywhere in a command — including inside a list/tibble literal like this one — and tracks their bodies as dependencies automatically, the same as an ordinary function call. Nothing extra needs to be wired up for `clean_conductivity_data`/`clean_temperature_data` to be tracked, and each stays independently named, testable, and readable instead of living as a branch in a `switch()`.
+
+**Verified caveat: this doesn't buy surgical invalidation for free.** `cleaning_dispatch` is a single, non-branched target — every branch of the downstream pattern depends on it as a whole. Tested empirically against targets 1.12: editing the body of just one of two dispatched functions, and separately adding an unrelated third row to the dispatch table, *both* rebuilt every existing branch of the downstream pattern rather than skipping the ones untouched by the change. Plain vector/list iteration rebuilds the whole pattern whenever its upstream target reruns for any reason — it does not diff row-by-row. If you want unaffected branches to actually skip when the dispatch table changes elsewhere, branch with `iteration = "group"` instead (see "Group" above): a stable `tar_group()` hash per group is what let a same-way-tested new-row addition leave existing branches alone in a side-by-side comparison, where default iteration rebuilt everything.
+
 ## Static branching with `tar_map()`
 
 Create multiple named targets from a template:
