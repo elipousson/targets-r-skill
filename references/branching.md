@@ -16,6 +16,26 @@ tar_target(
 )
 ```
 
+**Gotcha: branching over a list-valued target can hand each branch an extra layer of nesting.** It depends on the upstream target's `iteration` setting, not on `map()` itself:
+
+```r
+tar_target(input, list(a = 1:3, b = 4:6, c = 7:9)),   # default iteration = "vector"
+tar_target(out, show(input), pattern = map(input))
+# each branch receives list(a = 1:3) / list(b = 4:6) / list(c = 7:9) — still wrapped in a length-1 list
+```
+
+A plain list has default `iteration = "vector"`, and slicing a list vector-style keeps each element wrapped in a length-1 list (`vctrs::vec_slice()` on a list returns a list). You either unwrap it in the function (`input[[1]]`), or — usually cleaner — declare the upstream target's own iteration so it hands off bare elements instead:
+
+```r
+tar_target(input, list(a = 1:3, b = 4:6, c = 7:9), iteration = "list"),
+tar_target(out, show(input), pattern = map(input))
+# each branch now receives the bare element directly: 1:3 / 4:6 / 7:9, no unwrapping needed
+```
+
+Verified empirically against targets 1.12 — this isn't cosmetic, it changes what the function body has to do with its argument. The same `iteration = "list"` you'd set on a *downstream* target to avoid `vec_c()` recombination (see below) is worth setting on the *upstream* target too, for exactly this reason, whenever it holds heterogeneous list elements meant to be branched over one at a time.
+
+One exception: if the list is *named* and you want that name as an identifier (`names(model_spec)`), keep the upstream target at default vector iteration and unwrap manually — switching it to `iteration = "list"` strips the name along with the wrapping, since the bare element that comes through no longer carries it. See the provenance example below.
+
 ### `cross()` — Cartesian product
 
 One branch per combination:
@@ -101,7 +121,7 @@ tar_branches(analysis)            # full branch-level metadata table
 tar_name()                        # call inside a branch for its own name
 ```
 
-Provenance tracking:
+Provenance tracking — without it, a combined result loses track of which branch produced which row, which usually defeats the point of having branched at all:
 
 ```r
 tar_target(
@@ -112,6 +132,26 @@ tar_target(
     result
   },
   pattern = map(data)
+)
+```
+
+`tar_name()` gives the branch's synthetic name, which is enough to distinguish branches but isn't necessarily meaningful. When the upstream list carries real identifiers, pull the identifier from the data itself instead (or in addition) — this is the case from the gotcha above where you deliberately keep the upstream target at default vector iteration so `names()` still works, and unwrap the value yourself:
+
+```r
+tar_target(
+  model_spec,
+  list(lm = "y ~ x", rf = "y ~ .")   # default iteration = "vector" — kept deliberately, see above
+),
+tar_target(
+  fits,
+  {
+    model_name <- names(model_spec)   # "lm" / "rf" — only available because model_spec is still wrapped
+    spec       <- model_spec[[1]]     # the formula string itself
+    result <- fit_model(spec)
+    result$model_name <- model_name
+    result
+  },
+  pattern = map(model_spec)
 )
 ```
 
