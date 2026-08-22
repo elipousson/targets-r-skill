@@ -74,6 +74,10 @@ Watch for a target whose return value is a connection, client, or handle rather 
 
 Mixing `tar_target(name, command)` and `tar_plan()`'s implicit `name = command` shorthand is fine (both are valid `tarchetypes` idioms) — don't flag it as a bug. Do flag it if the mixing looks accidental rather than stylistic, e.g. one form used for 90% of targets and the other for a lone outlier with no apparent reason.
 
+### Custom target factories
+
+If `R/` has a function that calls `tar_target_raw()` and returns a list of targets, that's a custom target factory — check it against the design/naming guidance in [factories.md](factories.md), including its note on `tar_*`-prefixed functions that look like factories but aren't. Cross-reference usage the same way as the dead-code check above: a factory used pervasively across the pipeline is a good sign (repeated boilerplate got consolidated); one that's never actually called anywhere is dead code wearing an infrastructure-shaped name, easy to mistake for load-bearing.
+
 ### Batching opportunities
 
 Many near-identical `tar_target()` calls that differ only in a filter condition, a source URL, or a column selection are a candidate for dynamic branching (`pattern = map(...)`). Don't recommend this reflexively — heterogeneous transformations (different renames, different joins per item) are often clearer written out explicitly than forced into a branching pattern. Recommend it when the repeated targets are genuinely doing the same operation over different inputs.

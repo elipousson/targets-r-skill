@@ -64,6 +64,7 @@ Will Landau's `targets` manual and NEWS files are the authoritative source for m
 | Carpentries Incubator targets-workshop | https://carpentries-incubator.github.io/targets-workshop/ |
 | Modeling data workflows with targets | https://seanfobbe.com/posts/2023-11-12_modeling-data-workflows-with-targets/ |
 | Lessons from a large targets pipeline (cloud/spatial-heavy) | https://github.com/mdsumner/targeted-learning/blob/main/README.md |
+| R Targetopia contributing guide (target factories) | https://wlandau.github.io/targetopia/contributing.html#target-factories |
 
 ## License
 

@@ -25,6 +25,7 @@ Consult the appropriate reference file for detailed patterns and examples:
 | **Debugging** | [debugging.md](references/debugging.md) | `tar_workspace()`, `tar_igraph()`, browser(), cycles |
 | **Performance** | [performance.md](references/performance.md) | Memory, batching, parallel via crew, cloud + CAS |
 | **Literate** | [literate.md](references/literate.md) | Quarto, R Markdown, Typst/LaTeX compilation |
+| **Factories** | [factories.md](references/factories.md) | Writing your own target-factory function (not just using tarchetypes' built-in ones) when the same `tar_target()` boilerplate keeps repeating |
 | **Auditing** | [audit.md](references/audit.md) | Reviewing an existing pipeline for anti-patterns, untracked outputs, dead code, and performance issues — includes how to read `tarborist` IDE diagnostics if available |
 
 For requests that span multiple topics (e.g. "set up a parallel pipeline that renders a Quarto report"), read several files.
@@ -34,7 +35,7 @@ For requests that span multiple topics (e.g. "set up a parallel pipeline that re
 1. **Functions live in `R/`, targets live in `_targets.R`.** Source with `tar_source()`.
 2. **Targets return one saveable value and avoid side effects** (unless `format = "file"`).
 3. **Track every input file.** Use `tar_file_read()` rather than reading a literal path inside a target.
-4. **Prefer tarchetypes factories** (`tar_qs()`, `tar_file()`, `tar_parquet()`) to passing `format = "..."` manually.
+4. **Prefer tarchetypes factories** (`tar_qs()`, `tar_file()`, `tar_parquet()`) to passing `format = "..."` manually. If the same multi-target boilerplate (e.g. "track a URL, then read it") keeps repeating with no tarchetypes equivalent, write your own factory instead of copy-pasting — see [factories.md](references/factories.md).
 5. **Read the NEWS before relying on any behavior** — `targets` ships breaking-ish default changes roughly every minor release.
 
 ## Quick reference
