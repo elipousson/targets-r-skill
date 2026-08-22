@@ -26,6 +26,7 @@ Consult the appropriate reference file for detailed patterns and examples:
 | **Performance** | [performance.md](references/performance.md) | Memory, batching, parallel via crew, cloud + CAS |
 | **Literate** | [literate.md](references/literate.md) | Quarto, R Markdown, Typst/LaTeX compilation |
 | **Factories** | [factories.md](references/factories.md) | Writing your own target-factory function (not just using tarchetypes' built-in ones) when the same `tar_target()` boilerplate keeps repeating |
+| **Reproducibility** | [reproducibility.md](references/reproducibility.md) | Making pipeline dependencies visible to `renv` with `tar_renv()`, the init/snapshot/restore workflow, and a lighter manual-install alternative for small pipelines |
 | **Auditing** | [audit.md](references/audit.md) | Reviewing an existing pipeline for anti-patterns, untracked outputs, dead code, and performance issues — includes how to read `tarborist` IDE diagnostics if available |
 
 For requests that span multiple topics (e.g. "set up a parallel pipeline that renders a Quarto report"), read several files.
