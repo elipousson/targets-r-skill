@@ -1,13 +1,13 @@
 ---
 name: targets-r
-description: Modern patterns for reproducible analysis pipelines with the targets R package. Use this skill when writing `_targets.R`, defining targets, debugging pipeline failures, running individual targets safely, configuring storage, or integrating Quarto/R Markdown. Covers `tar_target()`, the tarchetypes factories, dynamic and static branching, error handling, cycle debugging, cloud and CAS repositories.
+description: Modern patterns for reproducible analysis pipelines with the targets R package, and auditing existing pipelines for problems. Use this skill when writing `_targets.R`, defining targets, debugging pipeline failures, running individual targets safely, configuring storage, or integrating Quarto/R Markdown. Also use it whenever the user asks to review, audit, analyze, or improve an existing targets pipeline — e.g. "is my _targets.R any good", "why is this pipeline slow", "clean up this pipeline", "check this for anti-patterns" — even if they don't name the targets package explicitly, as long as a `_targets.R` file or `tar_target()`/`tar_plan()` calls are involved. Covers `tar_target()`, the tarchetypes factories, dynamic and static branching, error handling, cycle debugging, cloud and CAS repositories, and a structured pipeline-audit checklist.
 license: CC-BY-4.0
 metadata:
   author: Ulrich Atz
   r_version: ">= 4.1.0"
   targets_version: ">= 1.12.0"
   tarchetypes_version: ">= 0.14.1"
-allowed-tools: Read, Edit, Write, Grep, Glob, Bash, mcp__r-btw__*
+allowed-tools: Read, Edit, Write, Grep, Glob, Bash, mcp__r-btw__*, mcp__ide__getDiagnostics
 ---
 
 # Building Pipelines with targets
@@ -25,6 +25,7 @@ Consult the appropriate reference file for detailed patterns and examples:
 | **Debugging** | [debugging.md](references/debugging.md) | `tar_workspace()`, `tar_igraph()`, browser(), cycles |
 | **Performance** | [performance.md](references/performance.md) | Memory, batching, parallel via crew, cloud + CAS |
 | **Literate** | [literate.md](references/literate.md) | Quarto, R Markdown, Typst/LaTeX compilation |
+| **Auditing** | [audit.md](references/audit.md) | Reviewing an existing pipeline for anti-patterns, untracked outputs, dead code, and performance issues — includes how to read `tarborist` IDE diagnostics if available |
 
 For requests that span multiple topics (e.g. "set up a parallel pipeline that renders a Quarto report"), read several files.
 
@@ -181,6 +182,23 @@ Avoid `tar_destroy()` when a scoped command will do:
 | `devtools::load_all()` for a local package | `install.packages()` + `imports = "pkg"` |
 | Reading a literal file path inside a target | Track the file with `tar_file()` so changes invalidate downstream targets |
 | Closures inside `tar_target()` commands | Define named functions in `R/` so targets can hash them |
+
+## Auditing an existing pipeline
+
+When asked to review, audit, analyze, or improve a pipeline someone already wrote, produce a **findings report** — don't edit files unless the user explicitly asks you to apply fixes. The goal is to give them something they can act on selectively, not a diff they have to accept wholesale.
+
+1. **Start with the structural pass, before anything itemized.** Is the pipeline organized in a way that reflects how the project's author thinks about the work — plans/files grouped by data source, by stage, by output, with branching used where the work is genuinely repeated and avoided where it isn't — or does the grouping look accidental? Is there a consistent scheme for where custom functions and other files live in the repository, and are those functions reasonably scoped (not doing too much, not fed an excessive number of inputs)? Do target and plan names share a vocabulary (e.g. a `read_`/`prep_`/`combine_` prefix convention marking pipeline stage, or `_out`/`_sf`/`_board_out` suffixes marking output shape or destination), and does every name in the file actually follow it? This pass belongs first in the report — it's what tells the user whether the pipeline is fundamentally sound and just needs spot fixes, or needs a reorganization before the itemized fixes are worth doing. See [audit.md](references/audit.md) for the full checklist and the sources behind these criteria.
+2. **Read the whole pipeline.** `_targets.R`, everything under `R/` (or wherever `tar_source()` points), and `_targets.yaml` if present. Skim before judging — a pattern that looks wrong in isolation (e.g. a hardcoded path) may be intentional given the project's scale or deployment target.
+3. **If `mcp__ide__getDiagnostics` is available, call it — it's free.** The `tarborist` VS Code/Positron extension (activates automatically on any workspace containing `_targets.R`) runs tree-sitter-based static analysis and publishes diagnostics tagged `"source": "tarborist"`: dependency cycles and unresolved target references, no R session required. Treat it as a fast pre-check, not ground truth — see [audit.md](references/audit.md) for how to tell a real finding from one of its known static-analysis blind spots (e.g. dynamic `tar_source()` paths cascade into false "unresolved symbol" warnings for everything defined in the un-resolvable file). If the tool isn't available, skip this step; it's a bonus, not a requirement.
+4. **Run live diagnostics if you have R execution available** (an IDE R session, `Rscript -e`, or an MCP R tool). These catch things static reading can't:
+   - `tar_manifest()` — every target and its command, useful for spotting duplicated logic
+   - `tar_outdated()` — is the store actually in sync with the code, or is something stale
+   - `tar_validate()` — catches malformed pipelines before you spend effort analyzing them
+   - `tar_igraph()` + `igraph::find_cycle()` — dependency cycles the author may not know about
+   If no R session is available, say so and proceed with a static read — don't block the audit on it.
+5. **Check against the anti-patterns table above**, then the fuller checklist in [audit.md](references/audit.md) — it covers things that table doesn't: untracked side-effect outputs, dead/commented-out code, external-data freshness policy, error-handling gaps around network calls, and inconsistent storage conventions.
+6. **Report findings, structural overview first**, using the template in audit.md: organization/naming/dead-code assessment, then itemized findings ranked by impact — what's wrong, why it matters (not just "this is an anti-pattern" — explain the concrete failure mode), and a specific fix. Group itemized findings by severity, not by file order, so the user can triage.
+7. **Don't manufacture findings.** A short, accurate report beats a long one padded with nitpicks. If the pipeline is in good shape, say so plainly.
 
 ## Example
 
