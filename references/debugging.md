@@ -148,6 +148,7 @@ This solves a different problem than `error = "continue"`/`"trim"`, not a redund
 tar_validate()                     # static check
 tar_outdated()                     # what will run?
 tar_visnetwork()                   # dependency graph (browser)
+tar_visnetwork(targets_only = TRUE)  # same, without the function nodes cluttering it
 tar_manifest() |> select(name, command)
 tar_deps(my_function)              # what this function depends on
 ```

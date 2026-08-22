@@ -187,7 +187,15 @@ tar_target(
   system2("curl", c("-s", url)),
   cue = tar_cue(mode = "always")
 )
+
+tar_target(
+  post_paths,
+  list.files("posts", full.names = TRUE),
+  cue = tar_cue(mode = "always")
+)
 ```
+
+`always` earns its keep on two different kinds of target: a live external call you deliberately want re-checked every run (`always_fresh` above), and a *discovery* target like `post_paths` — a directory's contents aren't an R object `targets` can hash as a dependency the way a value or a tracked file is, so scanning it needs to happen on every `tar_make()` just to find out whether there's anything new. Either way, `always` only forces the target itself to rerun; anything downstream still skips normally if what it returns is unchanged — a `pattern = map(post_paths)` branching target rebuilds only the branches for paths that are actually new or changed, not the whole set, as long as `post_paths`' returned vector is otherwise the same.
 
 Invalidate manually:
 

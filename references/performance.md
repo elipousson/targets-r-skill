@@ -44,6 +44,21 @@ Large model objects dominate target stores. Strategies:
 - `tar_delete(x)` — remove one target's stored value.
 - `tar_destroy()` — nuke `_targets/` entirely (prompt before running).
 
+## Splitting slow rendering from cheap construction
+
+For a pipeline with many figures, the ggplot *object* is usually trivial to build — the actual bottleneck is rendering it (layout, rasterizing, writing the file). A single target that builds and saves a plot in one command hides that split, so an unrelated upstream edit forces a full rebuild-and-rerender even when only the cheap half needed to change:
+
+```r
+tar_target(plot_spec, build_plot(data)),           # cheap: just constructs the ggplot object
+tar_target(
+  plot_out,
+  ggsave("plot.png", plot_spec, width = 8, height = 5),  # expensive: the actual rendering
+  format = "file"
+)
+```
+
+This is the same "split when part of the work is slow and part isn't" judgment call as the Function scoping guidance in the audit checklist, applied specifically to plots: worth doing once rendering time is large enough that you don't want it recomputed just because something upstream of construction changed for unrelated reasons; not worth the extra target for a pipeline where rendering is already fast.
+
 ## Parallel execution via crew
 
 ```r
@@ -54,6 +69,8 @@ tar_make()
 ```
 
 `crew` auto-scales workers and integrates with `memory = "auto"` / `retrieval = "auto"`. For HPC, swap in `crew.cluster::crew_controller_slurm()` or similar.
+
+`tar_crew()` summarizes what each worker actually did — which targets it ran and for how long — after a `tar_make()` completes. Reach for it (or `tar_meta()`'s `seconds` column, per "Profiling a completed run" below, if you don't need the per-worker breakdown) instead of hand-rolling a `Sys.getpid()`/timestamp tracer inside your own target functions; the metadata is already there.
 
 ## Scheduling: `priority` is gone
 

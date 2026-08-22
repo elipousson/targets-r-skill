@@ -121,6 +121,8 @@ tar_branches(analysis)            # full branch-level metadata table
 tar_name()                        # call inside a branch for its own name
 ```
 
+Branch names are content-hash-derived, not human-readable — expect something like `analysis_9bbb5ae3d1d3f95b`, not `analysis_group1`. Don't try to guess or hardcode one; `tar_branch_names()`/`tar_branches()` are how you look them up.
+
 Provenance tracking — without it, a combined result loses track of which branch produced which row, which usually defeats the point of having branched at all:
 
 ```r
@@ -176,7 +178,7 @@ tar_target(
 
 `targets` statically detects function symbols referenced anywhere in a command — including inside a list/tibble literal like this one — and tracks their bodies as dependencies automatically, the same as an ordinary function call. Nothing extra needs to be wired up for `clean_conductivity_data`/`clean_temperature_data` to be tracked, and each stays independently named, testable, and readable instead of living as a branch in a `switch()`.
 
-**Verified caveat: this doesn't buy surgical invalidation for free.** `cleaning_dispatch` is a single, non-branched target — every branch of the downstream pattern depends on it as a whole. Tested empirically against targets 1.12: editing the body of just one of two dispatched functions, and separately adding an unrelated third row to the dispatch table, *both* rebuilt every existing branch of the downstream pattern rather than skipping the ones untouched by the change. Plain vector/list iteration rebuilds the whole pattern whenever its upstream target reruns for any reason — it does not diff row-by-row. If you want unaffected branches to actually skip when the dispatch table changes elsewhere, branch with `iteration = "group"` instead (see "Group" above): a stable `tar_group()` hash per group is what let a same-way-tested new-row addition leave existing branches alone in a side-by-side comparison, where default iteration rebuilt everything.
+**Verified caveat: a function-valued column defeats the normal per-branch skip logic.** Ordinarily, `pattern = map()` diffs row-by-row — adding one new row to an upstream target only builds the new branch and skips the rest, whether the column holding the per-branch value is atomic (strings, numbers) or an ordinary list-column (vectors, data frames). Tested empirically against targets 1.12, side by side: adding an unrelated third row to a plain string column, and separately to a list-column of plain vectors, both correctly skipped the two untouched existing branches. Doing the exact same thing to `cleaning_dispatch` — adding a third row with a new function, touching neither `clean_conductivity_data` nor `clean_temperature_data` — rebuilt *every* branch instead, including the two whose functions hadn't changed. Editing one dispatched function's body (with no row added) has the same effect: every branch reruns, not just the one whose row references that function. The isolating factor is specifically the function objects, not list-columns or data frames in general — plain data of any shape diffs normally; a column of functions doesn't. There's no simple option to opt back into row-level skipping once functions are the payload, so budget for full-pattern reruns whenever any dispatched function changes, and keep each dispatched function itself cheap or memoized if that cost matters.
 
 ## Static branching with `tar_map()`
 
