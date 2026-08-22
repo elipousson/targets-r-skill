@@ -136,6 +136,18 @@ targets 1.11.4 made the **terse** reporter the default in non-interactive sessio
 tar_make(reporter = "verbose")  # terse | balanced | verbose | summary | null | forecast
 ```
 
+## Profiling a completed run with tar_meta()
+
+After `tar_make()` runs — even partially, since a skipped target keeps the metadata from whenever it last actually ran — profiling data is already sitting in the metadata store with no extra instrumentation needed:
+
+```r
+meta <- tar_meta(fields = c(name, seconds, bytes, warnings, error))
+meta[order(-meta$seconds), c("name", "seconds")]   # slowest targets
+meta[order(-meta$bytes), c("name", "bytes")]        # largest stored objects
+```
+
+`seconds` is the runtime of the target's *last successful run*, which may predate the current `tar_make()` if the target was skipped as up to date — that's a feature here, not a caveat, since it means every target that has ever run carries real timing without needing a fresh full rebuild. `bytes` is the total size of everything stored at the target's path, so it reflects the *serialized* size (after whatever `format` is set), not necessarily in-memory size. Use the two together to tell slow-but-small targets (branching/parallelism candidates) apart from fast-but-large ones (`format`/`butcher::butcher()` candidates) instead of guessing from the code alone.
+
 ## Performance checklist
 
 - `tar_option_set(format = "qs")`.

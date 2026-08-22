@@ -102,6 +102,28 @@ As with "Function scoping" above, this is a judgment call, not a rule — a pass
 
 Big `sf`/data-frame targets stored with the default format (`rds`) instead of `qs` or a parquet-based tarchetypes factory. Check `tar_option_set()` for a project-wide `format` before flagging individual targets — the fix is usually one line at the top, not N edits.
 
+### Runtime performance (only with the user's permission to run the pipeline)
+
+Everything above this point is judged from a static read plus read-only diagnostics (`tar_manifest()`, `tar_outdated()`, `tar_validate()`, `tar_igraph()`) — none of them execute a target's code. Measuring actual runtime or storage footprint requires the pipeline to have actually run, and running it has real consequences: live network calls, file writes, cloud/pins-board uploads, and, for a large pipeline, real time. **Ask before running it**, every time — don't treat "audit this pipeline" as standing permission to execute it. If the user declines or it's impractical, say in the report that performance was assessed statically only, not measured.
+
+If the user agrees, every target that has run at least once — this session or a previous one, since `seconds`/`bytes` persist in the metadata store and aren't reset by a skip — already has profiling data available with no extra instrumentation:
+
+```r
+meta <- tar_meta(fields = c(name, seconds, bytes, warnings, error))
+meta[order(-meta$seconds), c("name", "seconds")]   # slowest targets first
+meta[order(-meta$bytes), c("name", "bytes")]        # largest stored objects first
+```
+
+If the store is empty or most targets have never successfully run, `tar_make()` first (still with permission) — otherwise this just profiles whatever subset already has history. See "Profiling with tar_meta()" in [performance.md](performance.md) for more on interpreting the output.
+
+Don't report this as a separate pass — fold the numbers into findings you already made:
+- A slow target with no `pattern =` over clearly repeated, homogeneous inputs turns the "Batching opportunities" guess into a measured finding.
+- A large `bytes` value on a target stored in the default `rds` format connects to "Storage format tuning."
+- A slow target hitting a live external source with no cue policy connects to "External-data freshness."
+- Non-empty `warnings` or `error` columns are worth surfacing even when unrelated to performance — they're free once `tar_meta()` is already pulled.
+
+Citing an actual number ("`dgs_asset_list_file` took 340s and produced a 220MB `rds`") makes a performance finding far more actionable than a structural guess — but never manufacture one by running the pipeline without asking first.
+
 ## Report template
 
 ```markdown
