@@ -17,11 +17,11 @@ list(
 
 Inside `report.qmd`:
 
-```r
+````qmd
 ```{r}
 targets::tar_read(model)
 ```
-```
+````
 
 `tar_quarto()` scans the `.qmd` source for `tar_read()` / `tar_load()` calls and adds those targets as dependencies. You do not list them manually.
 
@@ -32,6 +32,32 @@ targets::tar_read(model)
 ### Repeated Quarto reports
 
 `tar_quarto_rep()` renders the same `.qmd` with different parameters, producing one branch per row of a parameter table. Use relative paths in the `output_file` column (0.13.1+). For Quarto >= 1.9, `tar_quarto_file()` handles the new `quarto inspect` output format (0.14.1).
+
+### Rendering a Quarto website
+
+`tar_quarto()` isn't limited to a single `.qmd` — point it at a directory containing a Quarto *project* (a `_quarto.yml` with `project: type: website`, or `type: book`) and it renders the whole multi-page site as one dependency-tracked target:
+
+```r
+tar_quarto(website, path = "analysis")
+```
+
+Every `.qmd` under `analysis/` gets scanned for `tar_read()`/`tar_load()` calls the same way a single-file target would, so the whole site rebuilds when any of its real upstream dependencies change — not just when a page's own source is edited.
+
+One gotcha specific to this multi-page case: each page executes with *its own file's directory* as the working directory, not the pipeline's root where `_targets/` lives. A `tar_load()`/`tar_read()` call inside a sub-page one level below the project root can silently fail to find the store unless you redirect it:
+
+````qmd
+```{r}
+withr::with_dir(here::here(), {
+  targets::tar_load(penguins_clean)
+})
+```
+````
+
+A single-file `tar_quarto(report, "report.qmd")` target never hits this — Quarto has no separate project directory to execute from in that case.
+
+### Quarto's `freeze` cache vs. targets' cache
+
+`_quarto.yml`'s `execute: freeze: auto` is a second, independent caching layer: Quarto skips re-executing a document's code chunks when their source hasn't changed, on top of — not coordinated with — `targets`' own skip logic for the `tar_quarto()` target itself. This matters most in CI, where the `_targets/` store usually isn't available but a committed `_freeze/` directory still lets Quarto avoid rerunning expensive chunks. The trap: if a `_freeze/` snapshot goes stale relative to what an upstream target actually produced, Quarto can serve cached chunk output that no longer matches the current pipeline run. If you rely on `targets` alone to know when to rebuild, don't commit `_freeze/` — or clear it whenever a real upstream dependency changes.
 
 ### Project configurations
 
