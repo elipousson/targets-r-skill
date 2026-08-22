@@ -61,6 +61,9 @@ Will Landau's `targets` manual and NEWS files are the authoritative source for m
 | tarchetypes reference | https://docs.ropensci.org/tarchetypes/ |
 | NEWS (targets) | https://github.com/ropensci/targets/blob/main/NEWS.md |
 | NEWS (tarchetypes) | https://github.com/ropensci/tarchetypes/blob/main/NEWS.md |
+| Pipeline organization lesson | https://carpentries-incubator.github.io/targets-workshop/instructor/organization.html |
+| Modeling data workflows with targets | https://seanfobbe.com/posts/2023-11-12_modeling-data-workflows-with-targets/ |
+| Lessons from a large targets pipeline (cloud/spatial-heavy) | https://github.com/mdsumner/targeted-learning/blob/main/README.md |
 
 ## License
 

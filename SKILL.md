@@ -86,6 +86,10 @@ project/
 | `tar_validate()` | Check pipeline validity |
 | `tar_prune()` | Delete stored targets no longer in pipeline |
 
+`tar_make()`'s progress line reads `260+, 12738-` — 260 targets built this run, 12,738 skipped because they were already up to date. A run that's mostly `-` is `targets` doing its job, not a sign something's wrong.
+
+Multi-project setups: `_targets.yaml` can hold settings (`store`, `script`, etc.) for multiple named projects. `Sys.setenv(TAR_PROJECT = "project_name")` switches which one `tar_make()` and friends use by default — it's a project *name* from the YAML, not a literal file path. `TAR_CONFIG` overrides which YAML file gets read at all (default `_targets.yaml`).
+
 ### Running targets safely
 
 Preview before running anything:
@@ -124,6 +128,18 @@ tar_target(
   cue = tar_cue(mode = "never")   # runs only when manually invalidated
 )
 ```
+
+For a toggle you flip instead of remembering to invalidate manually, make the mode conditional on an option or env var:
+
+```r
+tar_target(
+  slow_model,
+  fit_slow(data),
+  cue = tar_cue(mode = if (getOption("pipeline.dev_mode", FALSE)) "never" else "thorough")
+)
+```
+
+Useful when iterating on downstream targets and you don't want an expensive upstream step rerunning on every `tar_make()`.
 
 Avoid `tar_destroy()` when a scoped command will do:
 
@@ -182,6 +198,7 @@ Avoid `tar_destroy()` when a scoped command will do:
 | `devtools::load_all()` for a local package | `install.packages()` + `imports = "pkg"` |
 | Reading a literal file path inside a target | Track the file with `tar_file()` so changes invalidate downstream targets |
 | Closures inside `tar_target()` commands | Define named functions in `R/` so targets can hash them |
+| Storing a live connection/handle as a target's value (DB connection, API client, pins board object) | Store connection *parameters* and reconnect inside each target that needs it — live resources (sockets, external pointers, auth tokens with short lifetimes) don't survive serialization reliably, and a cached stale connection can fail silently downstream |
 
 ## Auditing an existing pipeline
 

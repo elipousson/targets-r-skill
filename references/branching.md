@@ -89,12 +89,15 @@ tar_target(
 )
 ```
 
+Branch order matches group order — a reliable 1:n guarantee, so branch 1 corresponds to group 1, branch 2 to group 2, and so on. Still, prefer carrying the group's identifying value through in the result itself (see "Provenance tracking" below) rather than relying solely on branch position — it's one less thing to get wrong if the grouping logic ever changes.
+
 ## Working with branch results
 
 ```r
 tar_read(analysis)                # all branches combined
 tar_read(analysis, branches = 1)  # one branch
 tar_branch_names(analysis)        # branch identifiers
+tar_branches(analysis)            # full branch-level metadata table
 tar_name()                        # call inside a branch for its own name
 ```
 

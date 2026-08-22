@@ -19,6 +19,8 @@ tar_option_set(
 
 You rarely need to override this. Set `memory = "persistent"` explicitly only when you know a value will be consumed many times in a tight loop that `targets` cannot see.
 
+The one case worth setting `memory = "transient"` explicitly: a target that feeds a `pattern` (so `"auto"` keeps it persistent by default) is itself large enough to cause memory pressure. Forcing it transient trades a reread cost per branch for lower peak memory — worth it when the object is big and branches don't all need it loaded simultaneously.
+
 ### `retrieval = "auto"` does the same thing for workers
 
 Dynamic branches reading a non-dynamic upstream target load the value on `"main"` once, then hand it to workers. Otherwise workers load their own dependencies.
@@ -76,6 +78,12 @@ Since targets 1.11:
 - `repository_meta` defaults to `"local"`, so metadata stays on your machine unless you opt in.
 - `tar_workspace_download()` fetches workspaces saved in the cloud for post-hoc debugging.
 
+**Format and repository are separate settings — don't combine them in one string.** Older code sometimes has `format = "aws_qs"`; that combined form is deprecated. Set them independently: `format = "qs", repository = "aws"`. This split is what lets you change *where* something is stored without changing *how* it's serialized.
+
+**`format = "file"` needs a real local path.** It checks the path with `file.exists()`, which only understands the local filesystem — a GDAL virtual path like `/vsis3/bucket/key` will not work as a `format = "file"` target's return value, even though R functions that read it (e.g. via `sf`/`terra`) may happily accept that string. If a target's whole job is to produce something that only exists in cloud storage under a virtual path, a common workaround: write directly to the cloud, query the cloud for a content hash (e.g. S3 ETag), and store a small local marker file containing the remote path + hash as the `format = "file"` target's return value. `targets` then tracks changes to the marker (and therefore to the remote object) without needing the remote path itself to satisfy `file.exists()`.
+
+For monitoring whether cloud-stored data changed *outside* the pipeline's control, a separate lightweight pipeline that re-queries current ETags and diffs them against what's stored in metadata is a reasonable pattern — a manual audit step distinct from the main build.
+
 ## Content-addressable storage (CAS)
 
 Added in 1.10. Good for deduplication and for sharing caches across machines:
@@ -89,6 +97,29 @@ tar_repository_cas_local_gc("~/targets-cas")
 ```
 
 Define custom backends with `tar_repository_cas(upload, download, exists, list, cost)`.
+
+**When CAS actually pays off**: multiple people or branches producing results without overwriting each other's stored objects, or needing to keep historical versions around for comparison. **When it doesn't**: large, frequently-changing outputs — you'll mostly pay the deduplication overhead without getting much deduplication, since the content rarely repeats.
+
+## Aggregating branch outputs without loading everything into memory
+
+If each dynamic branch writes its own Parquet file (`tar_parquet()` or a `format = "file"` target that writes one), you don't have to `tar_read()` and `dplyr::bind_rows()` every branch into memory to summarize across them. Point DuckDB at the branch outputs and let it stream through the files:
+
+```r
+tar_target(
+  summary,
+  {
+    con <- DBI::dbConnect(duckdb::duckdb())
+    on.exit(DBI::dbDisconnect(con, shutdown = TRUE))
+    DBI::dbGetQuery(
+      con,
+      "SELECT category, count(*) FROM read_parquet(?) GROUP BY category",
+      params = list(branch_files)
+    )
+  }
+)
+```
+
+This scales to branch counts and per-branch sizes that would otherwise blow up memory if combined naively — the aggregation target's peak memory is bounded by DuckDB's query execution, not by holding every branch's data frame at once.
 
 ## When the store is the bottleneck
 

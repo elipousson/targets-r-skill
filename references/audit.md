@@ -64,7 +64,11 @@ Targets that call out to Google Sheets, Airtable, ArcGIS REST services, or other
 
 ### Error handling around network calls
 
-Pipelines that read from multiple external APIs (ArcGIS, Airtable, SharePoint, Google Sheets) with the default `error = "stop"` mean one flaky endpoint aborts the entire run, including unrelated downstream work that had nothing to do with the failing target. Check whether `error = "trim"` or per-target `error = "continue"` on the network-dependent targets would let the rest of the pipeline finish. This is a suggestion, not a default recommendation — some pipelines genuinely want to halt on any missing input.
+Pipelines that read from multiple external APIs (ArcGIS, Airtable, SharePoint, Google Sheets) with the default `error = "stop"` mean one flaky endpoint aborts the entire run, including unrelated downstream work that had nothing to do with the failing target. Check whether `error = "trim"` or per-target `error = "continue"` on the network-dependent targets would let the rest of the pipeline finish — see the "Recovering from transient errors" workflow in [debugging.md](debugging.md) for the run-twice recovery pattern this enables. This is a suggestion, not a default recommendation — some pipelines genuinely want to halt on any missing input.
+
+### Live resources stored as target values
+
+Watch for a target whose return value is a connection, client, or handle rather than data — a database connection, an API client, a cloud-storage board/bucket object — especially one that several downstream targets then reuse as an argument. This is easy to miss because it often *works* in a single interactive run, but the object doesn't reliably survive `targets`' serialize-to-disk-and-reload cycle, and even when it does, a cached connection can be stale (expired token, closed session) by the time a downstream target uses it. See the "Function design" section in [targets.md](targets.md) for the fix — store connection parameters as the target and reconnect inside each consumer. Worth raising even when the pipeline's author clearly already knows the tradeoff (e.g. a code comment linking to a relevant GitHub discussion) — surface it as a confirmation-seeking note rather than a correction in that case, not a rediscovered bug.
 
 ### Naming and organization consistency
 

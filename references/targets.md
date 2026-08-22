@@ -48,7 +48,7 @@ tar_option_set(format = "qs")
 
 **`format = "file_fast"` is deprecated** (targets 1.10). `format = "file"` now automatically picks the timestamp strategy based on the file system.
 
-**Custom formats** should be built with `tar_format()` and live in extension packages (e.g. `tarchetypes::tar_format_nanoparquet()`, `geotargets`).
+**Custom formats** should be built with `tar_format()` and live in extension packages (e.g. `tarchetypes::tar_format_nanoparquet()`, `geotargets`). One gotcha if you write one yourself: the `convert()` function's return value is used both for change detection *and* as the value handed to `write()` — if those two need to differ (e.g. you want to hash a cheap summary but write the full object), you can't do it inside `convert()` alone.
 
 ### tarchetypes format factories
 
@@ -139,6 +139,20 @@ safe_fit <- function(data) {
   purrr::safely(fit_model)(data)
 }
 ```
+
+**Don't return live resources as a target's value.** Database connections, API clients, external pointers, open file handles — anything that wraps a socket or a C-level resource doesn't survive `targets`' serialize-to-disk-and-reload cycle reliably, even when it doesn't error outright. A cached connection object can also just be stale by the time a downstream target reads it (expired token, closed session). Store the connection *parameters* as the target instead, and open the connection inside each target that actually needs it:
+
+```r
+# Fragile: caches a live API client as a target's stored value
+tar_target(api_client, connect_to_api(key)),
+tar_target(result, query(api_client, "endpoint")),
+
+# Sturdier: the target stores parameters; each consumer connects itself
+tar_target(api_key, Sys.getenv("API_KEY")),
+tar_target(result, query(connect_to_api(api_key), "endpoint")),
+```
+
+If reconnecting per-target is genuinely expensive, that's a real tradeoff worth making deliberately — just don't do it by accident because it looked like a normal target.
 
 ## Options that matter
 

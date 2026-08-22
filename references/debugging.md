@@ -9,6 +9,7 @@ tar_errored()                                  # names of errored targets
 tar_meta(fields = error,    complete_only = TRUE)  # error messages
 tar_meta(fields = warnings, complete_only = TRUE)  # warnings
 tar_traceback(target_name)                     # full traceback
+tar_load_everything()                          # load every stored target into the global env for quick poking-around
 ```
 
 ## Reproduce the failure interactively
@@ -94,6 +95,15 @@ igraph::find_cycle(tar_igraph())
 | `"trim"` | Long pipelines where unrelated branches should keep going |
 
 `error = "trim"` (new in 1.10) is usually what you want for multi-branch pipelines: currently running targets finish, and queued targets still run as long as they are not downstream of the error and not sibling branches of the failed dynamic target.
+
+### Recovering from transient errors (flaky network calls, rate limits)
+
+Pipelines with many `tar_url_read()`/API-backed targets will occasionally hit a timeout or a rate limit that isn't a real bug — it's just a bad moment to ask that endpoint for data. Treat these as expected, not exceptional:
+
+1. Set `error = "continue"` (globally via `tar_option_set()`, or per-target on the network-dependent ones) so one flaky call doesn't abort work that has nothing to do with it.
+2. Run `tar_make()`. Targets that hit a transient failure are marked errored; everything else completes.
+3. Run `tar_make()` again. `targets` only reruns what's still outdated — i.e. the targets that errored — so this is a cheap retry, not a full rebuild. If the failures were genuinely transient, this second pass usually finishes them.
+4. If a target keeps failing across retries, reduce parallelism for that section of the pipeline (fewer `crew` workers hitting the same endpoint at once) before assuming it's a code bug.
 
 ### Custom error handling inside a target
 
