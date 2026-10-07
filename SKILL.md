@@ -111,6 +111,11 @@ tar_make(names = "report", shortcut = TRUE)   # rebuild report only, skip upstre
 
 `shortcut = TRUE` rebuilds only the named targets even if upstream is invalidated. Handy for rerunning a downstream report without recomputing expensive ancestors.
 
+It uses whatever upstream targets have stored, even when that's out of date, so watch for two traps:
+
+- **Edited inputs aren't reread.** If you changed a file the named targets depend on (e.g. a config file read with `tar_file_read()`), add the file target and the read target to `names` (`tar_make(names = c(config_file, config, report), shortcut = TRUE)`). Otherwise the named targets run with the old value, and any error they raise points at the wrong cause.
+- **Targets with no stored value can't be skipped.** A new upstream target, including the hidden `<name>_params` target that `tar_quarto_rep()` and `tar_render_rep()` create, stops a shortcut build with `cannot bootstrap target <name>_params because there is no record of <name>_params the metadata`. Add it to `names` or run once without `shortcut`.
+
 Scope invalidation and deletion the same way:
 
 ```r

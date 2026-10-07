@@ -24,6 +24,10 @@ Form a judgment about the pipeline as a whole before hunting for individual bugs
 
 tarborist also has editor-only features unavailable from a terminal session — a dependency heatmap (descendant count, output size, runtime) and "Organize Pipeline by DAG." Worth suggesting the user check these themselves in Positron/VS Code; don't claim to have seen them.
 
+### Known false alarms when loading the pipeline
+
+Messages like `Error in eval(x, envir = envir) : object 'x' not found` printed while the pipeline loads usually come from `tar_quarto()`/`tar_render()`/`tar_quarto_rep()` scanning a parameterized document whose chunk options use `eval: !expr` or `params`. They are harmless; don't list them as findings. See "Harmless 'object not found' messages" in [literate.md](literate.md) for how to confirm this and for the one real risk (a `tar_read()` in a conditional chunk may not be detected).
+
 ### Untracked side effects
 
 The most common real bug: a target calls `sf::write_sf()`/`arrow::write_parquet()`/`openxlsx2::wb_save()` directly, without `format = "file"` and without returning the path:
@@ -36,6 +40,25 @@ tar_target(
 ```
 
 `targets` can't hash the output, can't detect out-of-pipeline edits or deletions, and `tar_outdated()` won't flag it stale. Fix: `format = "file"` and return the path, or a tarchetypes factory (`tar_file()`) that already does this. If several targets repeat the write-then-return-invisibly shape, that's a signal for one shared wrapper function, not N individual fixes.
+
+A related case: moving or copying rendered reports in a separate target. The second target usually refers to the render target only to force ordering (often next to a FIXME about the dependency), and the moved files aren't tracked:
+
+```r
+tar_quarto_rep(reports, "report.qmd", execute_params = report_params),
+tar_target(
+  reports_move,
+  {
+    reports  # only here to force ordering
+    fs::file_move(report_params$output_file, fs::path("output", report_params$output_file))
+  }
+)
+```
+
+Moving the file also deletes the render target's tracked output, so the report renders again on every `tar_make()`. Fix: put the final path in an `output_file` column of `execute_params` (or use `tar_quarto(output_file = ...)` for a single report) and drop the move target. If the file must also exist in a second location, copy it with a `tar_file()` that depends on the render target's value (the rendered paths) and returns the new path.
+
+### Report file dependencies
+
+For each `tar_quarto()`/`tar_render()`/`tar_quarto_rep()` target, check that `extra_files` covers the R scripts, child documents, and format extensions the document uses but `tar_quarto_files()` doesn't list. See "Files the report uses: `extra_files`" in [literate.md](literate.md).
 
 ### Output path conventions
 
